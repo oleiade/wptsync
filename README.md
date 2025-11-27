@@ -26,13 +26,13 @@ As we implement Web APIs support in **Sobek** (k6's JavaScript runtime), ensurin
 You can run the tool directly using Go:
 
 ```bash
-go run main.go
+go run github.com/oleiade/wptsync
 ```
 
 Or build/install it:
 
 ```bash
-go install .
+go install github.com/oleiade/wptsync
 ```
 
 ### 2. Configuration (`wpt.json`)
