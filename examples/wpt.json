@@ -1,0 +1,23 @@
+{
+    "commit": "b5e12f331494f9533ef6211367dace2c88131fd7",
+    "target_dir": "wpt",
+    "patches": {
+      "resources/testharness.js": "patches/resources/testharness.js.patch"
+    },
+    "files": [
+      {
+        "src": "encoding/textdecoder-arguments.any.js",
+        "dst": "encoding/textdecoder-arguments.js"
+      },
+      {
+        "src": "resources/testharness.js",
+        "dst": "resources/testharness.js",
+        "patch": "patches/resources/testharness.js.patch"
+      },
+      {
+        "src": "encoding/resources/non-standard-labels.js",
+        "dst": "encoding/resources/non-standard-labels.js",
+        "enabled": false
+      }
+    ]
+  }
