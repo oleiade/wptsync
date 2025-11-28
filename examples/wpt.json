@@ -1,23 +1,84 @@
 {
-    "commit": "b5e12f331494f9533ef6211367dace2c88131fd7",
-    "target_dir": "wpt",
-    "patches": {
-      "resources/testharness.js": "patches/resources/testharness.js.patch"
+  "commit": "f5cac385941da42024176a1763f3941e33bb7bb0",
+  "target_dir": "wpt",
+  "files": [
+    {
+      "src": "encoding/textdecoder-arguments.any.js",
+      "dst": "encoding/textdecoder-arguments.js"
     },
-    "files": [
-      {
-        "src": "encoding/textdecoder-arguments.any.js",
-        "dst": "encoding/textdecoder-arguments.js"
-      },
-      {
-        "src": "resources/testharness.js",
-        "dst": "resources/testharness.js",
-        "patch": "patches/resources/testharness.js.patch"
-      },
-      {
-        "src": "encoding/resources/non-standard-labels.js",
-        "dst": "encoding/resources/non-standard-labels.js",
-        "enabled": false
-      }
-    ]
-  }
+    {
+      "src": "encoding/textdecoder-byte-order-marks.any.js",
+      "dst": "encoding/textdecoder-byte-order-marks.js"
+    },
+    {
+      "src": "encoding/textdecoder-copy.any.js",
+      "dst": "encoding/textdecoder-copy.js"
+    },
+    {
+      "src": "encoding/textdecoder-eof.any.js",
+      "dst": "encoding/textdecoder-eof.js"
+    },
+    {
+      "src": "encoding/textdecoder-fatal.any.js",
+      "dst": "encoding/textdecoder-fatal.js"
+    },
+    {
+      "src": "encoding/textdecoder-fatal-streaming.any.js",
+      "dst": "encoding/textdecoder-fatal-streaming.js"
+    },
+    {
+      "src": "encoding/textdecoder-ignorebom.any.js",
+      "dst": "encoding/textdecoder-ignorebom.js"
+    },
+    {
+      "src": "encoding/textdecoder-labels.any.js",
+      "dst": "encoding/textdecoder-labels.js"
+    },
+    {
+      "src": "encoding/textdecoder-streaming.any.js",
+      "dst": "encoding/textdecoder-streaming.js"
+    },
+    {
+      "src": "encoding/textdecoder-utf16-surrogates.any.js",
+      "dst": "encoding/textdecoder-utf16-surrogates.js"
+    },
+    {
+      "src": "encoding/textencoder-constructor-non-utf.any.js",
+      "dst": "encoding/textencoder-constructor-non-utf.js"
+    },
+    {
+      "src": "encoding/textencoder-utf16-surrogates.any.js",
+      "dst": "encoding/textencoder-utf16-surrogates.js"
+    },
+    {
+      "src": "encoding/resources/encodings.js",
+      "dst": "encoding/resources/encodings.js",
+      "patch": "patches/encoding/resources/encodings.js.patch"
+    },
+    {
+      "src": "common/sab.js",
+      "dst": "common/sab.js",
+      "patch": "patches/common/sab.js.patch"
+    },
+    {
+      "src": "resources/testharness.js",
+      "dst": "resources/testharness.js",
+      "patch": "patches/resources/testharness.js.patch"
+    },
+    {
+      "src": "encoding/resources/non-standard-labels.js",
+      "dst": "encoding/resources/non-standard-labels.js",
+      "enabled": false
+    },
+    {
+      "src": "resources/testharnessreport.js",
+      "dst": "resources/testharnessreport.js",
+      "enabled": false
+    },
+    {
+      "src": "resources/WebIDLParser.js",
+      "dst": "resources/WebIDLParser.js",
+      "enabled": false
+    }
+  ]
+}

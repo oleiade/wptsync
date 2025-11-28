@@ -35,21 +35,170 @@ func (f fileSpec) isEnabled() bool {
 	return f.Enabled == nil || *f.Enabled
 }
 
-func main() {
-	var (
-		configPath   = flag.String("config", "wpt.json", "path to the WPT sync configuration file")
-		skipPatching = flag.Bool("skip-patches", false, "download files but do not apply any configured patches")
-		dryRun       = flag.Bool("dry-run", false, "print the actions that would be taken without writing files")
-	)
-	flag.Parse()
+const usage = `wptsync - Sync files from the web-platform-tests repository
 
-	if err := run(*configPath, *skipPatching, *dryRun); err != nil {
-		fmt.Fprintf(os.Stderr, "sync-wpt: %v\n", err)
+Usage:
+  wptsync <command> [options]
+
+Commands:
+  init    Create a new wpt.json configuration file
+  sync    Download WPT files according to the configuration (default)
+
+Examples:
+  wptsync init                   Create wpt.json with the latest WPT commit
+  wptsync init -config=my.json   Create a custom config file
+  wptsync                        Sync files using wpt.json
+  wptsync sync                   Same as above, explicit command
+  wptsync sync -dry-run          Preview what would be synced
+  wptsync -config=custom.json    Sync using a custom config file
+
+Run 'wptsync <command> -h' for more information on a command.
+`
+
+func main() {
+	if len(os.Args) < 2 {
+		runSyncCommand(os.Args[1:])
+		return
+	}
+
+	switch os.Args[1] {
+	case "init":
+		runInitCommand(os.Args[2:])
+	case "sync":
+		runSyncCommand(os.Args[2:])
+	case "help", "-h", "--help":
+		fmt.Print(usage)
+	default:
+		// If the first argument looks like a flag, treat it as sync command
+		if strings.HasPrefix(os.Args[1], "-") {
+			runSyncCommand(os.Args[1:])
+			return
+		}
+		fmt.Fprintf(os.Stderr, "wptsync: unknown command %q\n\n", os.Args[1])
+		fmt.Fprint(os.Stderr, usage)
 		os.Exit(1)
 	}
 }
 
-func run(configPath string, skipPatching, dryRun bool) error {
+func runInitCommand(args []string) {
+	initFlags := flag.NewFlagSet("init", flag.ExitOnError)
+	initFlags.Usage = func() {
+		fmt.Fprintln(initFlags.Output(), `Create a new wpt.json configuration file
+
+Usage:
+  wptsync init [options]
+
+The init command fetches the latest commit SHA from the web-platform-tests
+repository and creates a configuration file with an empty files list.
+
+Options:`)
+		initFlags.PrintDefaults()
+	}
+	configPath := initFlags.String("config", "wpt.json", "path to the configuration file to create")
+	initFlags.Parse(args)
+
+	if err := runInit(*configPath); err != nil {
+		fmt.Fprintf(os.Stderr, "wptsync init: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runSyncCommand(args []string) {
+	syncFlags := flag.NewFlagSet("sync", flag.ExitOnError)
+	syncFlags.Usage = func() {
+		fmt.Fprintln(syncFlags.Output(), `Download WPT files according to the configuration
+
+Usage:
+  wptsync sync [options]
+  wptsync [options]
+
+The sync command downloads files from the web-platform-tests repository
+at the commit specified in the configuration file, and optionally applies
+patches to customize them.
+
+Options:`)
+		syncFlags.PrintDefaults()
+	}
+	configPath := syncFlags.String("config", "wpt.json", "path to the WPT sync configuration file")
+	skipPatching := syncFlags.Bool("skip-patches", false, "download files but do not apply any configured patches")
+	dryRun := syncFlags.Bool("dry-run", false, "print the actions that would be taken without writing files")
+	syncFlags.Parse(args)
+
+	if err := runSync(*configPath, *skipPatching, *dryRun); err != nil {
+		fmt.Fprintf(os.Stderr, "wptsync sync: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+const wptGitHubAPIURL = "https://api.github.com/repos/web-platform-tests/wpt/commits/master"
+
+func runInit(configPath string) error {
+	// Check if config already exists
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("config file %q already exists", configPath)
+	}
+
+	fmt.Printf("Fetching latest WPT commit...\n")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	commit, err := fetchLatestCommit(ctx)
+	if err != nil {
+		return fmt.Errorf("fetch latest commit: %w", err)
+	}
+
+	cfg := config{
+		Commit:    commit,
+		TargetDir: "wpt",
+		Files:     []fileSpec{},
+	}
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0o644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+
+	fmt.Printf("Created %s with commit %s\n", configPath, commit)
+	return nil
+}
+
+func fetchLatestCommit(ctx context.Context) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, wptGitHubAPIURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub API returned %s", resp.Status)
+	}
+
+	var result struct {
+		SHA string `json:"sha"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+
+	if result.SHA == "" {
+		return "", errors.New("empty commit SHA in response")
+	}
+
+	return result.SHA, nil
+}
+
+func runSync(configPath string, skipPatching, dryRun bool) error {
 	root, err := filepath.Abs(filepath.Dir(configPath))
 	if err != nil {
 		return fmt.Errorf("determine repo root from config: %w", err)
@@ -62,6 +211,11 @@ func run(configPath string, skipPatching, dryRun bool) error {
 
 	if err := cfg.validate(); err != nil {
 		return err
+	}
+
+	if len(cfg.Files) == 0 {
+		fmt.Println("No files configured to sync.")
+		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -103,9 +257,6 @@ func (c *config) validate() error {
 	}
 	if c.TargetDir == "" {
 		return errors.New("config: target_dir must be provided")
-	}
-	if len(c.Files) == 0 {
-		return errors.New("config: files list cannot be empty")
 	}
 	return nil
 }

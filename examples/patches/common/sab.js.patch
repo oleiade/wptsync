@@ -1,0 +1,46 @@
+diff --git a/wpt/common/sab.js b/wpt/common/sab.js
+index a3ea610..4cc21fb 100644
+--- a/wpt/common/sab.js
++++ b/wpt/common/sab.js
+@@ -1,21 +1,22 @@
+ const createBuffer = (() => {
+   // See https://github.com/whatwg/html/issues/5380 for why not `new SharedArrayBuffer()`
+-  let sabConstructor;
+-  try {
+-    sabConstructor = new WebAssembly.Memory({ shared:true, initial:0, maximum:0 }).buffer.constructor;
+-  } catch(e) {
+-    sabConstructor = null;
++  // let sabConstructor;
++  // try {
++  //   sabConstructor = new WebAssembly.Memory({ shared:true, initial:0, maximum:0 }).buffer.constructor;
++  // } catch(e) {
++  //   sabConstructor = null;
++  // }
++  return (_ignoredType, length, _ignoredOpts) => {
++    // if (type === "ArrayBuffer") {
++    //   return new ArrayBuffer(length, opts);
++    // } else if (type === "SharedArrayBuffer") {
++    //   if (sabConstructor && sabConstructor.name !== "SharedArrayBuffer") {
++    //     throw new Error("WebAssembly.Memory does not support shared:true");
++    //   }
++    //   return new sabConstructor(length, opts);
++    // } else {
++    //   throw new Error("type has to be ArrayBuffer or SharedArrayBuffer");
++    // }
++    return new ArrayBuffer(length);
+   }
+-  return (type, length, opts) => {
+-    if (type === "ArrayBuffer") {
+-      return new ArrayBuffer(length, opts);
+-    } else if (type === "SharedArrayBuffer") {
+-      if (sabConstructor && sabConstructor.name !== "SharedArrayBuffer") {
+-        throw new Error("WebAssembly.Memory does not support shared:true");
+-      }
+-      return new sabConstructor(length, opts);
+-    } else {
+-      throw new Error("type has to be ArrayBuffer or SharedArrayBuffer");
+-    }
+-  }
+-})();
++})();
+\ No newline at end of file

@@ -1,0 +1,39 @@
+diff --git a/wpt/encoding/resources/encodings.js b/wpt/encoding/resources/encodings.js
+index 80933bf..478a584 100644
+--- a/wpt/encoding/resources/encodings.js
++++ b/wpt/encoding/resources/encodings.js
+@@ -466,3 +466,34 @@ const encodings_table =
+   }
+ ]
+ ;
++
++// The Sobek TextDecoder implementation only supports the UTF-8 and UTF-16
++// families today, so prune the WPT encoding table accordingly to avoid executing
++// irrelevant tests that are guaranteed to fail.
++const supportedEncodingNames = new Set([
++  "UTF-8",
++  "UTF-16BE",
++  "UTF-16LE",
++]);
++
++(function filterUnsupportedEncodings() {
++  const filteredSections = [];
++
++  encodings_table.forEach(section => {
++    const filteredEncodings = section.encodings.filter(encoding =>
++      supportedEncodingNames.has(encoding.name)
++    );
++
++    if (filteredEncodings.length === 0) {
++      return;
++    }
++
++    filteredSections.push({
++      heading: section.heading,
++      encodings: filteredEncodings,
++    });
++  });
++
++  encodings_table.length = 0;
++  Array.prototype.push.apply(encodings_table, filteredSections);
++})();
