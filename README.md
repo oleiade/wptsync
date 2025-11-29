@@ -35,9 +35,33 @@ Or build/install it:
 go install github.com/oleiade/wptsync
 ```
 
-### 2. Configuration (`wpt.json`)
+### 2. Initialize a Configuration
 
-Create a `wpt.json` file in your project root. This file defines which commit to check out, where to put the files, and which files to sync.
+Create a new `wpt.json` configuration file with the latest WPT commit:
+
+```bash
+wptsync init
+```
+
+This fetches the latest commit SHA from the WPT repository and creates a configuration file:
+
+```json
+{
+  "commit": "3a2402822007826e89a1dc4fd5534977cccd1753",
+  "target_dir": "wpt",
+  "files": []
+}
+```
+
+You can also specify a custom config path:
+
+```bash
+wptsync init -config=my-wpt-config.json
+```
+
+### 3. Configuration (`wpt.json`)
+
+Edit the `wpt.json` file to define which files to sync. The file specifies the commit to check out, where to put the files, and which files to download.
 
 ```json
 {
@@ -70,9 +94,15 @@ Create a `wpt.json` file in your project root. This file defines which commit to
   - `patch`: (Optional) Path to a local patch file to apply to the downloaded file.
   - `enabled`: (Optional) Set to `false` to skip syncing this file.
 
-### 3. Running the Tool
+### 4. Sync Files
 
-Sync files based on `wpt.json`:
+Download files based on your configuration:
+
+```bash
+wptsync sync
+```
+
+Or simply:
 
 ```bash
 wptsync
@@ -80,12 +110,27 @@ wptsync
 
 **Options:**
 
-- `--config <path>`: Use a different configuration file (default: `wpt.json`).
-- `--dry-run`: Print what actions would be taken without writing files.
-- `--skip-patches`: Download files but do not apply the configured patches.
+- `-config <path>`: Use a different configuration file (default: `wpt.json`).
+- `-dry-run`: Print what actions would be taken without writing files.
+- `-skip-patches`: Download files but do not apply the configured patches.
 
 ```bash
-wptsync --config=my-wpt-config.json --dry-run
+wptsync sync -config=my-wpt-config.json -dry-run
+```
+
+### 5. Getting Help
+
+View available commands and examples:
+
+```bash
+wptsync -h
+```
+
+Get help for a specific command:
+
+```bash
+wptsync init -h
+wptsync sync -h
 ```
 
 ## Creating Patches
