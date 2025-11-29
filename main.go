@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -42,15 +43,15 @@ Usage:
 
 Commands:
   init    Create a new wpt.json configuration file
+  add     Add files from a WPT folder to the configuration
   sync    Download WPT files according to the configuration (default)
 
 Examples:
   wptsync init                   Create wpt.json with the latest WPT commit
-  wptsync init -config=my.json   Create a custom config file
+  wptsync add url/               Add all files from the url/ folder
+  wptsync add encoding/          Add all files from encoding/ recursively
   wptsync                        Sync files using wpt.json
-  wptsync sync                   Same as above, explicit command
   wptsync sync -dry-run          Preview what would be synced
-  wptsync -config=custom.json    Sync using a custom config file
 
 Run 'wptsync <command> -h' for more information on a command.
 `
@@ -64,6 +65,8 @@ func main() {
 	switch os.Args[1] {
 	case "init":
 		runInitCommand(os.Args[2:])
+	case "add":
+		runAddCommand(os.Args[2:])
 	case "sync":
 		runSyncCommand(os.Args[2:])
 	case "help", "-h", "--help":
@@ -99,6 +102,41 @@ Options:`)
 
 	if err := runInit(*configPath); err != nil {
 		fmt.Fprintf(os.Stderr, "wptsync init: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runAddCommand(args []string) {
+	addFlags := flag.NewFlagSet("add", flag.ExitOnError)
+	addFlags.Usage = func() {
+		fmt.Fprintln(addFlags.Output(), `Add files from a WPT path to the configuration
+
+Usage:
+  wptsync add <path> [options]
+
+The add command fetches files from the web-platform-tests repository and adds
+entries to the configuration. You can specify a single .js file or a folder
+(which will be scanned recursively for .js files). Files ending in .any.js
+are mapped to .js in the destination path.
+
+Arguments:
+  <path>    Path in the WPT repository (e.g., url/, resources/testharness.js)
+
+Options:`)
+		addFlags.PrintDefaults()
+	}
+	configPath := addFlags.String("config", "wpt.json", "path to the configuration file")
+	addFlags.Parse(args)
+
+	if addFlags.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "wptsync add: missing required path argument")
+		addFlags.Usage()
+		os.Exit(1)
+	}
+
+	wptPath := addFlags.Arg(0)
+	if err := runAdd(*configPath, wptPath); err != nil {
+		fmt.Fprintf(os.Stderr, "wptsync add: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -196,6 +234,157 @@ func fetchLatestCommit(ctx context.Context) (string, error) {
 	}
 
 	return result.SHA, nil
+}
+
+func runAdd(configPath, wptPath string) error {
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		return err
+	}
+
+	// Normalize the path: remove leading/trailing slashes
+	wptPath = strings.Trim(wptPath, "/")
+
+	fmt.Printf("Fetching file list from %s...\n", wptPath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	files, err := listFilesInPath(ctx, cfg.Commit, wptPath)
+	if err != nil {
+		return fmt.Errorf("list files: %w", err)
+	}
+
+	if len(files) == 0 {
+		fmt.Printf("No .js files found in %s\n", wptPath)
+		return nil
+	}
+
+	// Build a set of existing src paths for deduplication
+	existing := make(map[string]bool)
+	for _, f := range cfg.Files {
+		existing[f.Src] = true
+	}
+
+	// Add new files
+	added := 0
+	for _, src := range files {
+		if existing[src] {
+			continue
+		}
+
+		dst := src
+		// Strip .any.js suffix to .js
+		if strings.HasSuffix(dst, ".any.js") {
+			dst = strings.TrimSuffix(dst, ".any.js") + ".js"
+		}
+
+		cfg.Files = append(cfg.Files, fileSpec{
+			Src: src,
+			Dst: dst,
+		})
+		added++
+		fmt.Printf(" + %s\n", src)
+	}
+
+	if added == 0 {
+		fmt.Println("No new files to add (all files already in config).")
+		return nil
+	}
+
+	// Write updated config
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0o644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+
+	fmt.Printf("Added %d files to %s\n", added, configPath)
+	return nil
+}
+
+const wptGitHubContentsAPI = "https://api.github.com/repos/web-platform-tests/wpt/contents"
+
+func listFilesInPath(ctx context.Context, commit, pathPrefix string) ([]string, error) {
+	var files []string
+	if err := listFilesRecursive(ctx, commit, pathPrefix, &files); err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+type githubItem struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Type string `json:"type"`
+}
+
+func listFilesRecursive(ctx context.Context, commit, path string, files *[]string) error {
+	url := fmt.Sprintf("%s/%s?ref=%s", wptGitHubContentsAPI, path, commit)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("path %q not found in repository", path)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GitHub API returned %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+
+	// Check if response is an array (directory) or object (single file)
+	// by looking at the first non-whitespace character
+	trimmed := bytes.TrimLeft(body, " \t\n\r")
+	if len(trimmed) > 0 && trimmed[0] == '{' {
+		// Single file object
+		var singleItem githubItem
+		if err := json.Unmarshal(body, &singleItem); err != nil {
+			return fmt.Errorf("decode response: %w", err)
+		}
+		// Add it if it's a .js file
+		if singleItem.Type == "file" && strings.HasSuffix(singleItem.Path, ".js") {
+			*files = append(*files, singleItem.Path)
+		}
+		return nil
+	}
+
+	// Directory listing (array)
+	var items []githubItem
+	if err := json.Unmarshal(body, &items); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+
+	for _, item := range items {
+		if item.Type == "file" {
+			// Only include .js files
+			if strings.HasSuffix(item.Path, ".js") {
+				*files = append(*files, item.Path)
+			}
+		} else if item.Type == "dir" {
+			if err := listFilesRecursive(ctx, commit, item.Path, files); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func runSync(configPath string, skipPatching, dryRun bool) error {

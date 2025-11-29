@@ -14,6 +14,7 @@ As we implement Web APIs support in **Sobek** (k6's JavaScript runtime), ensurin
 ## Features
 
 - **Version Control**: Sync files from a specific git commit hash.
+- **Bulk Import**: Add entire WPT folders to your config with a single command.
 - **File Mapping**: Rename or relocate files from the WPT structure to your project structure.
 - **Patching**: Automatically apply `git apply` compatible patches to downloaded files.
 - **Toggleable**: Enable or disable specific file syncs directly in the config.
@@ -59,7 +60,25 @@ You can also specify a custom config path:
 wptsync init -config=my-wpt-config.json
 ```
 
-### 3. Configuration (`wpt.json`)
+### 3. Add Files from WPT
+
+Instead of manually listing files, you can add `.js` files directly:
+
+```bash
+wptsync add resources/testharness.js   # Add a single file
+wptsync add url/                        # Add all .js files from a folder
+```
+
+When adding a folder, it recursively fetches all `.js` files. Files with `.any.js` extensions are automatically mapped to `.js` in the destination path:
+
+```
+url/url-constructor.any.js  →  url/url-constructor.js
+url/resources/setters.js    →  url/resources/setters.js
+```
+
+The command skips files that are already in the configuration, making it safe to run multiple times.
+
+### 4. Configuration (`wpt.json`)
 
 Edit the `wpt.json` file to define which files to sync. The file specifies the commit to check out, where to put the files, and which files to download.
 
@@ -94,7 +113,7 @@ Edit the `wpt.json` file to define which files to sync. The file specifies the c
   - `patch`: (Optional) Path to a local patch file to apply to the downloaded file.
   - `enabled`: (Optional) Set to `false` to skip syncing this file.
 
-### 4. Sync Files
+### 5. Sync Files
 
 Download files based on your configuration:
 
@@ -118,7 +137,7 @@ wptsync
 wptsync sync -config=my-wpt-config.json -dry-run
 ```
 
-### 5. Getting Help
+### 6. Getting Help
 
 View available commands and examples:
 
@@ -130,6 +149,7 @@ Get help for a specific command:
 
 ```bash
 wptsync init -h
+wptsync add -h
 wptsync sync -h
 ```
 
