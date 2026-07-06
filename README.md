@@ -137,7 +137,17 @@ wptsync
 wptsync sync -config=my-wpt-config.json -dry-run
 ```
 
-### 6. Getting Help
+### 6. Update the Pinned Commit
+
+Move to a newer WPT commit and re-sync everything in one step:
+
+```bash
+wptsync update
+```
+
+This fetches the latest WPT commit (or use `-commit <sha>` to pin a specific one), updates `wpt.json`, and re-syncs every enabled file. Patches that no longer apply against the new commit are reported at the end instead of aborting the run; the affected files are left pristine so you can re-add your changes and run `wptsync save <path>` to regenerate their patches.
+
+### 7. Getting Help
 
 View available commands and examples:
 
@@ -151,18 +161,29 @@ Get help for a specific command:
 wptsync init -h
 wptsync add -h
 wptsync sync -h
+wptsync update -h
+wptsync edit -h
+wptsync save -h
 ```
 
-## Creating Patches
+## Creating and Updating Patches
 
-To create a patch for a WPT file:
+After a sync, each downloaded file on disk is the pristine WPT file with its patch (if any) applied. To create a new patch or update an existing one:
 
-1. Make changes to the file locally.
-2. Generate a diff using `git diff`.
+1. (Optional) Restore the file to a known state first:
 
-```bash
-git diff > patches/my-fix.patch
-```
+   ```bash
+   wptsync edit common/sab.js
+   ```
 
-Ensure the patch file is referenced in your `wpt.json` configuration. `wptsync` uses `git apply` to apply these patches.
+2. Edit the file in `target_dir` directly.
+3. Save your edits as a patch:
+
+   ```bash
+   wptsync save common/sab.js
+   ```
+
+The `save` command downloads the pristine file at the pinned commit, diffs it against your on-disk file, and writes the result to the file's patch (default: `patches/<dst>.patch`), registering it in `wpt.json` if it is new. Because the on-disk file already carries the previous patch, extending an existing patch is the same flow: edit, then `save`. If the file no longer differs from pristine, `save` removes the patch and its config reference.
+
+Patches are standard `git apply` format, so you can still craft or adjust them by hand if you prefer.
 
