@@ -25,6 +25,9 @@ type SyncOptions struct {
 	SkipPatches bool
 	// DryRun prints the actions that would be taken without writing files.
 	DryRun bool
+	// Force bypasses the freshness stamp, forcing a full sync even when the
+	// stamp indicates the local files are already up to date.
+	Force bool
 	// BaseURL is the raw file base URL. Empty means DefaultBaseURL.
 	BaseURL string
 	// Logf receives progress messages. Nil means no output.
@@ -66,10 +69,20 @@ func Sync(ctx context.Context, configPath string, opts *SyncOptions) error {
 	baseURL := opts.baseURL()
 	skipPatching := opts != nil && opts.SkipPatches
 	dryRun := opts != nil && opts.DryRun
+	force := opts != nil && opts.Force
 
 	if len(cfg.Files) == 0 {
 		logf("No files configured to sync.\n")
 		return nil
+	}
+
+	// ponytail: no cross-process locking; two packages syncing the same config concurrently can race on first population. Add a lock file if that ever happens.
+	if !dryRun && !force && !skipPatching {
+		stampFile := stampPath(root, cfg)
+		if hash, err := computeStamp(configPath, root, cfg); err == nil && stampIsFresh(stampFile, hash, root, cfg) {
+			logf("wpt files up to date (stamp match); skipping sync\n")
+			return nil
+		}
 	}
 
 	logf("Syncing %d WPT files from %s at commit %s\n", len(cfg.Files), baseURL, cfg.Commit)
@@ -82,6 +95,10 @@ func Sync(ctx context.Context, configPath string, opts *SyncOptions) error {
 		if err := processFile(ctx, root, cfg, file, skipPatching, dryRun, baseURL, logf); err != nil {
 			return err
 		}
+	}
+
+	if !dryRun && !skipPatching {
+		writeStamp(configPath, root, cfg)
 	}
 
 	return nil

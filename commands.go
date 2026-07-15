@@ -306,12 +306,17 @@ func Update(ctx context.Context, configPath, commit string) error {
 	}
 
 	if len(failed) > 0 {
+		if err := os.Remove(stampPath(root, cfg)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(os.Stderr, "   warning: remove stale freshness stamp: %v\n", err)
+		}
 		fmt.Fprintf(os.Stderr, "\nPatches that no longer apply (files left pristine):\n")
 		for _, dst := range failed {
 			fmt.Fprintf(os.Stderr, " - %s\n", dst)
 		}
 		return fmt.Errorf("%d patch(es) failed to apply; edit the file(s) and run `wptsync save <path>` to regenerate them", len(failed))
 	}
+
+	writeStamp(configPath, root, cfg)
 
 	fmt.Printf("Updated to commit %s\n", commit)
 	return nil

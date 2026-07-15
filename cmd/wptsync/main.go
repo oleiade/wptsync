@@ -241,11 +241,13 @@ Options:`)
 	configPath := syncFlags.String("config", "wpt.json", "path to the WPT sync configuration file")
 	skipPatching := syncFlags.Bool("skip-patches", false, "download files but do not apply any configured patches")
 	dryRun := syncFlags.Bool("dry-run", false, "print the actions that would be taken without writing files")
+	force := syncFlags.Bool("force", false, "bypass the freshness stamp and force a full sync")
 	syncFlags.Parse(args)
 
 	opts := &wptsync.SyncOptions{
 		SkipPatches: *skipPatching,
 		DryRun:      *dryRun,
+		Force:       *force,
 		Logf:        func(format string, args ...any) { fmt.Printf(format, args...) },
 	}
 
