@@ -1,4 +1,4 @@
-package main
+package wptsync
 
 import (
 	"strings"
@@ -36,36 +36,48 @@ func TestRewritePatchPaths(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	base := config{Commit: "abc", TargetDir: "wpt"}
+	base := Config{Commit: "abc", TargetDir: "wpt"}
+
+	noCommit := base
+	noCommit.Commit = ""
+	if err := noCommit.validate(); err == nil {
+		t.Error("expected error for missing commit")
+	}
+
+	noTargetDir := base
+	noTargetDir.TargetDir = ""
+	if err := noTargetDir.validate(); err == nil {
+		t.Error("expected error for missing target_dir")
+	}
 
 	ok := base
-	ok.Files = []fileSpec{{Src: "a.js", Dst: "a.js"}, {Src: "b.js", Dst: "sub/b.js"}}
+	ok.Files = []FileSpec{{Src: "a.js", Dst: "a.js"}, {Src: "b.js", Dst: "sub/b.js"}}
 	if err := ok.validate(); err != nil {
 		t.Errorf("valid config rejected: %v", err)
 	}
 
 	traversal := base
-	traversal.Files = []fileSpec{{Src: "a.js", Dst: "../evil.js"}}
+	traversal.Files = []FileSpec{{Src: "a.js", Dst: "../evil.js"}}
 	if err := traversal.validate(); err == nil {
 		t.Error("expected error for dst escaping target_dir")
 	}
 
 	dup := base
-	dup.Files = []fileSpec{{Src: "a.any.js", Dst: "a.js"}, {Src: "a.js", Dst: "a.js"}}
+	dup.Files = []FileSpec{{Src: "a.any.js", Dst: "a.js"}, {Src: "a.js", Dst: "a.js"}}
 	if err := dup.validate(); err == nil {
 		t.Error("expected error for duplicate dst")
 	}
 
 	empty := base
-	empty.Files = []fileSpec{{Src: "", Dst: "a.js"}}
+	empty.Files = []FileSpec{{Src: "", Dst: "a.js"}}
 	if err := empty.validate(); err == nil {
 		t.Error("expected error for empty src")
 	}
 }
 
 func TestFindFileSpec(t *testing.T) {
-	cfg := &config{
-		Files: []fileSpec{
+	cfg := &Config{
+		Files: []FileSpec{
 			{Src: "common/sab.any.js", Dst: "common/sab.js"},
 		},
 	}
