@@ -38,6 +38,18 @@ func TestRewritePatchPaths(t *testing.T) {
 func TestValidate(t *testing.T) {
 	base := Config{Commit: "abc", TargetDir: "wpt"}
 
+	noCommit := base
+	noCommit.Commit = ""
+	if err := noCommit.validate(); err == nil {
+		t.Error("expected error for missing commit")
+	}
+
+	noTargetDir := base
+	noTargetDir.TargetDir = ""
+	if err := noTargetDir.validate(); err == nil {
+		t.Error("expected error for missing target_dir")
+	}
+
 	ok := base
 	ok.Files = []FileSpec{{Src: "a.js", Dst: "a.js"}, {Src: "b.js", Dst: "sub/b.js"}}
 	if err := ok.validate(); err != nil {

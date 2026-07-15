@@ -1,3 +1,8 @@
+// Package wptsync syncs files listed in a wpt.json configuration from the
+// web-platform-tests repository into a local project directory, applying any
+// configured patches. It can be used as a CLI (see cmd/wptsync) or called
+// directly as a library from Go code, for example from a TestMain to fetch
+// test fixtures before a test suite runs.
 package wptsync
 
 import (

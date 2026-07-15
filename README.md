@@ -187,3 +187,47 @@ The `save` command downloads the pristine file at the pinned commit, diffs it ag
 
 Patches are standard `git apply` format, so you can still craft or adjust them by hand if you prefer.
 
+## Use as a library
+
+`wptsync` can also be called directly from Go code instead of run as a CLI. This is useful for
+fetching WPT fixtures on demand from a test suite, so contributors and CI don't need to run
+`wptsync sync` as a separate step:
+
+```go
+package mypkg_test
+
+import (
+    "context"
+    "log"
+    "os"
+    "testing"
+    "time"
+
+    "github.com/oleiade/wptsync"
+)
+
+func TestMain(m *testing.M) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+    if err := wptsync.Sync(ctx, "wpt.json", nil); err != nil {
+        cancel()
+        log.Fatalf("syncing WPT test fixtures: %v", err)
+    }
+    cancel()
+    os.Exit(m.Run())
+}
+```
+
+A few things to know:
+
+- Add `target_dir` to `.gitignore`. The synced files are fetched on demand, not committed.
+- `Sync` writes a freshness stamp (`<target_dir>/.wptsync-stamp`) after a full successful sync.
+  As long as the config and any referenced patches haven't changed and every destination file is
+  still present, later calls return immediately without touching the network. This keeps repeated
+  `go test` runs fast and lets them work offline once fixtures are in place.
+- `SyncOptions` controls the run: `Logf` receives progress messages, `BaseURL` overrides where
+  files are downloaded from (mainly useful for tests), `Force` bypasses the freshness stamp,
+  `SkipPatches` downloads files without applying patches, and `DryRun` reports what would happen
+  without writing anything.
+- `git` must be on `PATH` if any tracked file has a `patch` configured, since patches are applied
+  with `git apply`.
+
